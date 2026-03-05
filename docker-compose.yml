@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  database:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - db_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: activity_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: activity-api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      DATABASE_URL: mongodb://user:password@database:27017/activity_db?authSource=admin
+      API_PORT: 3000
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 50
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+    restart: on-failure
+
+  consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    container_name: activity-consumer
+    environment:
+      NODE_ENV: development
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      DATABASE_URL: mongodb://user:password@database:27017/activity_db?authSource=admin
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: on-failure
+
+volumes:
+  db_data:
+
+networks:
+  app-network:
+    driver: bridge

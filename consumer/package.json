@@ -1,0 +1,24 @@
+{
+    "name": "event-tracker-consumer",
+    "version": "1.0.0",
+    "description": "Worker service that consumes activity events from RabbitMQ and persists them to MongoDB",
+    "main": "src/worker.js",
+    "scripts": {
+        "start": "node src/worker.js",
+        "dev": "nodemon src/worker.js",
+        "test": "jest --forceExit --detectOpenHandles"
+    },
+    "dependencies": {
+        "amqplib": "^0.10.3",
+        "mongoose": "^7.6.3"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0"
+    },
+    "jest": {
+        "testEnvironment": "node",
+        "testMatch": [
+            "**/tests/**/*.test.js"
+        ]
+    }
+}
